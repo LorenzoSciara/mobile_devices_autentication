@@ -1,0 +1,190 @@
+\chapter{Implementation Details}
+\label{chap:Implementation Details}
+%This is where you explain what you have implemented and how you have implemented it. Place here all the details that you consider important, organize the chapter in sections and subsections to explain the development and your workflow.\\Given the self-explicative title of the chapter, readers usually skip it. This is ok, because this entire chapter is simply meant to describe the details of your work so that people that are very interested (such as people who have to evaluate your work or people who have to build something more complex starting from what you did) can fully understand what you developed or implemented.\\Don't worry about placing too many details in this chapter, the only essential thing is that you keep everything tidy, without mixing too much information (so make use of sections, subsections, lists, etc.). As usual, pictures are helpful.
+In this chapter, we will explore the implementation of our unique device identification technique in details. We will see into the technical aspects, the design choices and the key steps that made the creation of this system possible. From the use of the Trusted Execution Environment (TEE) and the Android Keystore system to the cryptographic mechanisms adopted, we will analyze the fundamental components of the project and how they work. We will also look at the challenges encountered during development and the strategies adopted to overcome them. This chapter is designed to provide a broad understanding of the inner workings of the project, preparing the reader to appreciate the complexity and effectiveness of the implemented solution.
+
+\section{Keystore} \label{Keystore}
+\subsection{Keystore security features}\label{Security features}
+The Android Keystore system protects key material from unauthorized use in two ways. First, it reduces the risk of unauthorized use of key material from outside the Android device by preventing the extraction of the key material from application processes and from the Android device as a whole; key material never enters the application process, and also key material can be \textbf{bound} to the secure hardware of the Android device, such as the Trusted Execution Environment (\textbf{TEE}). Second, the Keystore system reduces the risk of unauthorized use of key material within the Android device by making apps specify the authorized uses of their keys and then enforcing those restrictions outside of the apps' processes. Authorizations are then enforced by the Android Keystore whenever the key is used; this is an advanced security feature that is generally useful only if your requirements are that a compromise of your application process after key generation/import (but not before or during) can't lead to unauthorized uses of the key.
+\subsection{Useful API}\label{Useful API}
+Here are the Keystore System classes and methods we used,  which can be found in the \textbf{java.security} library.
+\begin{itemize}
+    \item \textbf{public class KeyStore}: this class represents a storage facility for cryptographic keys and certificates. A KeyStore manages different types of entry, each one identified by an "alias" string. In the case of private keys and their associated certificate chains, these strings distinguish among the different ways in which the entity may authenticate itself. For example, the entity may authenticate itself using different certificate authorities, like the key-pair we generate.
+    \item \textbf{public static KeyStore getInstance(String type)}: returns a keystore object of the specified type. This method traverses the list of registered security Providers, starting with the most preferred Provider. A new KeyStore object encapsulating the KeyStoreSpi implementation from the first Provider that supports the specified type is returned.
+    \item \textbf{public final void load(KeyStore.LoadStoreParameter param)}: loads this keystore using the given LoadStoreParameter. Note that if this KeyStore has already been loaded, it is reinitialized and loaded again from the given parameter.
+    \item \textbf{java.security.cert.Certificate[] getCertificateChain(String alias)}: this method returns the certificate chain for the requested alias if it exists. The certificate chain represents the bound the key-pair has with the device since the first one, the one that certifies and signs the key-pair, is issued from the unique TEE of the smartphone.
+\end{itemize}
+
+\section{Verifying key-pairs with Key Attestation} \label{Verifying hardware-backed key pairs with Key Attestation}
+\subsection{Key Attestation}\label{Key Attestation}
+Key attestation allows the server to verify that the requested key lives in secure hardware, such as the attestation signing key is protected by secure hardware like TEEs and signing is performed in the secure hardware. It also allows servers to verify that each use of the key is gated by user verification, preventing unauthorized uses of the key. In \textbf{Android}, the attestation statement is signed by an attestation key injected into the secure hardware (TEE) at the factory. Attestation statements are produced in the form of an X.509 certificate. Google provides the root CA and certifies attestation keys to each vendor.
+\subsection{Retrieve and verify a hardware-backed key pair}\label{Retrieve and verify a hardware-backed key pair}
+During key attestation, is possible to use the Android Keystore system specifying the alias of the key pair we want to attest. It, in return, provides a certificate chain, which can be used to verify the properties of that key pair. If the device supports hardware-level key attestation, the root certificate within this chain is signed using an attestation root key, which the device manufacturer injects into the device's hardware-backed Keystore at the factory. 
+
+\subsection{Examples}\label{Examples}
+    To implement key attestation, complete the following steps: 
+    \begin{itemize}
+        \item[$\bullet$] Use a KeyStore object's \textit{getCertificateChain()} method to get a reference to the chain of X.509 certificates associated with the hardware-backed Keystore.
+        \item[$\bullet$] Check each certificate's validity using an X509Certificate object's \textit{checkValidity()} methods. Also verify that the root certificate is trustworthy with \textit{verify() }method.
+        \item[$\bullet$] Verify the status of each certificate (valid/revoked/suspended) downloading the Google CRL from the official CRL distribution point and looking fot the certificate serial number in the list.
+        \item[$\bullet$] Also, it is possible to extract extension data from the X.509 certificate using a parser (e.g. ASN.1 parser) and compare them with the set of values that you expect the hardware-backed key to contain.
+    \end{itemize}
+    The following example consists of two certificates of the four in the certificate chain, since they are the most important to understand. The certificate chain is extracted from a sample device, and they are standard X.509 certificates with optional extensions.  Certificate 0 is the certificate of the public key to attest that was generated in the sample device, whereas Certificate 3 is the root certificate that represent the Google CA that self signs. Certificates 1 and 2 represents respectively the second level of the device TEE that signs the first one (cert0) and the Google CA that signs the second level of the TEE (cert1).
+
+
+    Here are decoded X.509 certificates:
+    \begin{itemize}
+        \item \textbf{Certificate 0}:
+        \begin{lstlisting}
+        Certificate:
+            Data:
+                Version: 3 (0x2)
+                Serial Number: 1 (0x1)
+            Signature Algorithm: ecdsa-with-SHA256
+                Issuer:
+                    Title=TEE, serialNumber="c6047571d8f0d17c"
+                Validity
+                    Not Before: Jan 1 00:00:00 1970 GMT
+                    Not After : Jan 19 03:14:07 2038 GMT
+                Subject:
+                    commonName = Android Keystore Key
+                Subject Public Key Info:
+                    Public Key Algorithm: id-ecPublicKey
+                        Public-Key: (256 bit)
+                        pub:
+                            04:21:01:97:84:c5:06:91:99:f7:f0:cc:33:ee:fd:
+                            4a:4e:fd:e8:78:2f:b2:b1:6b:f4:bc:12:64:57:60:
+                            fa:2c:80:e5:a0:aa:01:16:a4:c8:98:65:2e:64:48:
+                            a0:91:43:8a:ce:4d:f4:0f:89:93:7a:b0:27:7e:66:
+                            67:d9:69:aa:c2
+                        ASN1 OID: prime256v1
+                    X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature
+                1.3.6.1.4.1.11129.2.1.17:
+            Signature Algorithm: ecdsa-with-SHA256
+                30:45:02:20:0e:15:a8:83:3c:f2:9a:d9:a7:54:2f:d1:eb:de:
+                f6:db:c9:61:28:07:46:d9:ce:f1:af:b7:d2:50:9e:da:de:84:
+                02:21:00:9a:18:dc:a8:00:79:80:87:ac:23:f0:79:74:a5:46:
+                47:26:45:2c:55:73:69:64:4a:e3:79:65:db:6e:53:9d:68
+        \end{lstlisting}
+        
+        \item \textbf{Certificate 3}:
+        \begin{lstlisting}
+            Certificate:
+            Data:
+                Version: 3 (0x2)
+                Serial Number: 1 (0x1)
+            Signature Algorithm: ecdsa-with-SHA256
+            
+                Issuer:
+                    serialNumber="f92009e853b6b045"                    
+                Validity
+                    Not Before: May 26 16:28:52 2016 GMT
+                    Not After : May 24 16:28:52 2026 GMT                   
+                Subject:
+                    serialNumber="f92009e853b6b045"
+                    
+                Subject Public Key Info:
+                    Public Key Algorithm: rsaEncryption
+                        Public-Key: (4096 bit)
+                        Modulus:
+                            00:af:b6:c7:82:2b:b1:a7:01:ec:2b:b4:2e:8b:cc:
+                            54:16:63:ab:ef:98:2f:32:c7:7f:75:31:03:0c:97:
+                            [...]
+                            96:43:ef:0f:4d:69:b6:42:00:51:fd:b9:30:49:67:
+                            3e:36:95:05:80:d3:cd:f4:fb:d0:8b:c5:84:83:95:
+                            26:00:63                        
+                        Exponent: 65537 (0x10001)
+                        
+                X509v3 extensions:
+                    X509v3 Subject Key Identifier:                                
+                    36:61:E1:00:7C:88:05:09:51:8B:44:6C:47:FF:1A:4C:C9:EA:4F:12
+                        X509v3 Authority Key Identifier:                                
+                    keyid:36:61:E1:00:7C:88:05:09:51:8B:44:6C:47:FF:1A:4C:C9:EA
+                        
+                    X509v3 Basic Constraints: critical
+                        CA:TRUE
+                    X509v3 Key Usage: critical
+                        Digital Signature, Certificate Sign, CRL Sign
+                    X509v3 CRL Distribution Points:
+                    
+                        Full Name:
+                            URI:https://android.googleapis.com/attestation/crl/
+                            
+            Signature Algorithm: sha256WithRSAEncryption
+                20:c8:c3:8d:4b:dc:a9:57:1b:46:8c:89:2f:ff:72:aa:c6:f8:
+                44:a1:1d:41:a8:f0:73:6c:c3:7d:16:d6:42:6d:8e:7e:94:07:
+                [...]
+                06:06:9a:2f:8d:65:f8:40:e1:44:52:87:be:d8:77:ab:ae:24:
+                e2:44:35:16:8d:55:3c:e4
+        \end{lstlisting}
+    \end{itemize}
+
+
+Note that:
+
+\begin{itemize}
+    \item[$\bullet$] The issuer of certificate 0 is the \textbf{TEE of the smartphone}, uniquely identified by its serial number. This is a fundamental information at the base of our attestation mechanism.
+    \item[$\bullet$] Certificate 3 is the one of Google that, as CA, self signs itself. Among the certificate extensions we can find \textbf{CA:TRUE} and the official \textbf{CRL Distribution point}. The \textbf{serialNumber="f92009e853b6b045"} is publicly known to be the Google CA serial number for operation of this purpose.
+\end{itemize}
+
+\section{Client-Server Architecture}\label{CS Architecture}
+In order to create a client-server architecture, an approach with TCP/IP socket is used, running within a local area network. The Server has its IP address and port hardcoded and on them it listens for incoming connections, whereas the Client has to manually insert the IP address and the port of the Server to which it wants to send the signed data for verification.
+To create the socket we have used the Java \textit{Socket} class and the Java \textit{ServerSocket} class with the following methods:
+    \begin{itemize}
+        \item[$\bullet$] \textbf{Server-side}: \textit{new ServerSocket(serverPort)}: creates a server socket, bound to the specified port.
+        \item[$\bullet$] \textbf{Client-side}: \textit{new Socket(serverIp, serverPort)}: creates a stream socket and connects it to the specified Server IP address and port number
+    \end{itemize}
+Communication through the socket takes place thanks to Java streams, that are sequence of data. An input stream, defined by the Java \textit{InputStream} class, is used to read data from the source. An output stream, defined by the Java \textit{OutputStream} class, is used to write data to the destination.
+\\Futhermore, the \textit{BufferedReader} and \textit{PrintWriter} classes were also used for the communication with the following method. This classes, which are generated from OutputStream and InputStream objects, offer specific methods for writing and reading string, character or numeric data, ensuring that the data is sent and received in an appropriate format.
+It was decided to use different stream classes for communication because client and server exchange different types of data, some that are better to stay in bytes (for example: signature, certificate chain) and others that are more convenient to send typed (for example: the final results of the verification which are of type String).
+
+\section{Client Implementation}\label{Client Implementation}
+    \subsection{Key Pair Generation}
+        First of all, we need to create an instance of the KeyStore using the \textit{getInstance()} method of the \textit{KeyStore} class, then using the \textit{KeyPairGenerator} class we can initialize the builder method with all the parameters that we want to control, for example: \textbf{key alias}, key purpose (encryption, signature etc.), key padding, key length, etc. One of the most curious parameter is the \textit{setUserAuthenticationRequired} which force the device to have done the user authentication through the screen unlock of the device, since a limited amount of time, otherwise no operation can be performed.
+        \\After that the key pair can finally be generated and automatically inserted inside the KeyStore system. When you want to extract the key-pair, you need to refer to it through the \textit{getEntry()} method specifying the key alias. In this way it is possible to retrieve the securely stored entry and then also obtain the secret and public key with the methods \textit{getPublicKey()} and \textit{getPrivateKey()}.
+    \subsection{Signature Generation}
+        In order to generate the signature we need to extract the key pair from the KeyStore and distinct the private and the public key; compute the digest over the data to be signed, using an hash algorithm previously decided with the server (in our case we decided to use the SHA-256 hash algorithm), and the performing the signature, over the computed digest, using the \textit{Signature} class and the Private Key previously generated.
+    \subsection{Connection to the Server}
+        At this point we send the signature value to the server. We can now extract the certificate chain associated to the public key of the key-pair using the Keystore method \textit{getCertificateChain()} providing the alias of the key. So we start sending the Certificate Chain, sending one certificate at a time preceded by its length, in order to tell the server how many bytes it have to read to separate the certificates.
+        \\ After having sent all the information, the client waits for the responses from the server computation, and updates the graphics in order to display them.
+\section{Server Implementation}\label{Server Implementation}
+    The Server creates the Socket object generating its endpoint and assigns its IP address and the port. It can now opens all the input and output streams, that allow it to receive and send data, and can starts waiting for incoming connections and sent data.
+    \\When the client connects, first data the server receives is the signature value, and after that, it start receiving the certificate chain of four certificates. For each certificate it receives also its length in order to know how many bytes read before the start of the next one.
+    \\ After having received all the data, the Server has the duty to perform three kind of verifications: the Certificate chain validitation, the signature validation and the check on the TEE serial number of the sender. This last step is the fundamental check in our implementations, since it evaluates if the TEE serial number extracted from the first certificate of the chain (the one that certifies the public key of sender) is actually the one of the sender. In this way we can be certain that the data has been actually sent from that client.
+    \\\\It is important to note that the checks are done in the specified order given that first of all it is necessary to verify the authenticity of the public key by validating the certificate chain tracing it back to the legitimate sender; then, using the public key, it is possible to verify the received digital signature object; finally the most important check is carried out.
+    \\Let's now analyze in details the three verifications.
+    \subsection{Certificate Chain Validation}
+        This part is about verifying all the certificates in the certificate chain. It is important to remember that the certificate chain is automatically generated by the client Keystore system when the key-pait is generated. Since the used device has the possibility to generate Hardware-backed keys, the public key is signed by the specific TEE of the device.\\
+        In this phase, three kinds of checks are performed on the certificates.
+        
+        \begin{itemize}
+            \item[$\bullet$] a first check on the certificate temporal validity, to understand if the certificate is still valid i.e. it is not expired. The X509Certificate \textit{ checkValidity() } method is used;
+            \item[$\bullet$] the second check uses the X509Certificate \textit{ verify() } method to verify that the certificate was correctly signed using the private key of the certificate in the upper level in the certificate chain (parent certificate, starting from the last one of Google CA);
+            \item[$\bullet$] the last check is about the status of the certificate. The server fetches the CRL from the Google official CRL distribution point, that is the Google API \\\textit{https://android.googleapis.com/attestation/status}.
+            \\It gets a list of revoked certificates and looks in it for the analyzed certificate by comparing its serial number to those in the list in order to check if it has been revoked or suspended.
+        \end{itemize}
+        After these three checks, if all four certificates are valid, the last step is to compare the Public Key of the root self-signed certificate (certificate 3 in the chain), with the hardcoded Public Key retrieved from the Google documentation: in this way we assure that it has been emitted from Google itself, and not from someone who claims to be the Google Certificate Authority.
+        
+    \subsection{Signature Validation}
+        Server verifies the received Digital Signature object using the same hash algorithm of the client (in this case SHA-256). The computation of the signature is equal to the one performed by the Client, but in this case there is an additional step which check if the two digests are equal (integrity of data). In this step are used the hardcoded sample data and the Public Key extracted from the first certificate of the certificate chain.
+        
+    \subsection{TEE Serial Number Validation}
+        This last check, for which it is assumed that the previous ones have been successful, is the one that really makes it possible to satisfy the requirement of the initial problem: univocally linking the sent data to the device that generated and sent it.\\
+        The Server extracts the TEE serial number from the first certificate in the chain (the one of the key-pair used) where it (the TEE) is addressed as the "Issuer of the Certificate", since it creates the certificate for the key pair used and "signs" the key pair. Then, the server compares it to a TEE serial number that it already known (in this case we hardcoded it). In practice, this presuppose that the server already knows the Client TEE serial number, maybe because in verification phase it can have physical access to the verified device.
+        It is guaranteed that the extracted TEE serial number is the one of the creator of the key-pair because it is inside the certificate which integrity has been previously verified.
+\section{Issues and Possible Extensions}
+    \subsection{Client Side}
+    \begin{itemize}
+        \item[$\bullet$] The data signed and transmitted are a fixed sample string hardcoded in the client: can be extended by inserting an input TextField in order to allow user to insert its own text. Although feasible, this solution would bring other security-related complications. Indeed, the string entered by the client must be securely transferred to the server, and this means that it should have the properties of integrity and confidentiality.
+        \item[$\bullet$]Secure trasmission of the TEE serial number: advanced solutions could be adopted with which the client could be able to securely communicate its TEE serial number to the server, in the case that the verification could take place remotely and the server does not have physical access to the device under analysis. In this case the transmission of it should be totally secure and complications related to its confidentiality and integrity should be added.
+    \end{itemize}
+    \subsection{Server Side}
+    \begin{itemize}
+        \item[$\bullet$] The IP address on which the socket is opened is hardcoded in the code. It could better if it could be retrieved from the Network interface, avoiding the need to reload a new code when there is some network change.
+        \item[$\bullet$] Data that have been signed client side, are hardcoded also in the server, so there is no need to transmit them over the network. When Client will be capable of sending arbitrary data, server code must be modified in order to consider also the  of the reception of the signed data to verify.
+        \item[$\bullet$] In the case the client sends his TEE serial number, the server should be modified in order to have the possibility to receive securely the serial number, and/or to store a list of devices that can ask for verification.
+    \end{itemize}
+    We deliberately decided to separate the three validation responses in Certificate Chain validation, signature validation and TEE serial number validation \textbf{in order to show which part may fail}. It is clear that if, for example, the Certificate chain validation fails for some reason, all the signature validation must fail, instead continuing to check the signature value and the TEE serial number correspondence. In this "error case" the final result of the verification should be negative.
+        

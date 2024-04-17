@@ -1,0 +1,106 @@
+\chapter{Implementation Overview}
+\label{chap:Implementation Overview}
+%In this chapter you should provide a general overview of the project, explaining what you have implemented staying at a high-level of abstraction, without going too much into the details. Leave details for the implementation chapter. This chapter can be organized in sections, such as goal of the project, issues to be solved, solution overview, etc.\\It is very important to add images, schemes, graphs to explain the original problem and your solution. Pictures are extremely useful to understand complex ideas that might need an entire page to be explained.\\Use multiple sections to explain the starting point of your project, the last section is going to be the high-level view of your solution...so take the reader in a short `journey` to showcase your work.
+\section{Starting point}\label{Starting point}
+
+It is needed to develop a methodology to prove the origin of some data, originating from a mobile device, to an external verifier. So, two apps have been developed: 
+\begin{itemize}
+    \item one that plays the role of the client i.e. the device that produces a data, signs and sends it to the server app.
+    \item one that plays the role of the server that receives the data and must ascertain the client's identity performing some operations that are able to securely link the data received to the device that sent it.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.2]{images/icons.jpeg}}
+    \caption{Icons of the two apps}
+\end{figure}
+
+The two apps are put in communication with each other through the use of TCP/IP Sockets in a local network context. The sockets endpoints are identified by an IP address and a port number. 
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.35]{images/Socket.jpg}}
+    \caption{Socket is identified by its ip address and port number}
+\end{figure}
+
+
+\section{Client-side}
+The client asks the Android Keystore to generate an asymmetric key pair, taking advantage of the methods it provides for the generation of a key pair.
+Since the Keystore uses the TEE as root of trust to perform its operation, the created key is automatically associated with an X.509 certificate whose issuer is the TEE of the device. This first certificate is signed by another one in a certificates chain of four that hierarchically sign each other until the fourth and last that is the self-signed Google CA certificate.
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.25]{images/certificateChain.jpg}}
+    \caption{The certificate chian}
+\end{figure}
+It is fundamental to note that, in our solution, the use of the TEE serial number (TEE-SN) as issuer of the first certificate is the first step to uniquely associate a given data to the device that produced it, since the TEE-SN \textbf{uniquely identifies the device}.
+
+At this point, the client takes care of producing data, computing a digest, encrypting it with its private key and sending it to the server as a digital signature object, together with its Certificate Chain.
+Finally, the client will wait for a feedback from the server, which will tell it if he was able to identify it and successfully complete the data-client binding operation.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.4]{images/sign.jpg}}
+    \caption{The client produces the data, processes a digest, encrypts it with its own private key and sends it to the server as a digital signature}
+\end{figure}
+
+
+\section{Server-side}
+The first step of the server, after receiving the signature and the certificate chain from the client, is to check the validity of each certificate. To do so, for each certificate the following verifications are performed:
+\begin{itemize}
+    \item verification of the validity date;
+    \item verify that the certificate was successfully signed with the private key of the certificate at the upper level in the chain, until the Google self-signed certificate, for which its public key is also verified. Note that the Google public-key for these purposes is publicly available and therefore usable for verification
+    \item online verification of the certificate status. The application makes an http request, which downloads the Google CRL at the official CRL distribution point. At this point, it can check the status of the certificate, i.e. whether it has been revoked/suspended or not.
+\end{itemize}
+
+The next step for the server is to extract the client's public key from the certificate chain, which is nothing more than the corresponding public key of the private key with which the client performed the signature. With the public key, the server decrypts the signature received. The result will then be compared with the data digest. If there is a match, the signature has been verified.
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.4]{images/verify.jpg}}
+    \caption{The server receives the signature and verifies it, calculating the digest on the data and decrypting the signature with the public key of the client}
+\end{figure}
+
+%The next step for the server is to check the validity of each certificate in the certificate chain. For each certificate the following verifications are performed:
+
+%\begin{itemize}
+%    \item verification of the validity date;
+%    \item verify that the certificate was successfully signed with the private key of the certificate at the upper level in the chain, until the Google self-signed certificate, for which its public key is also verified. Note that the Google public-key for these purposes is publicly available and therefore usable for verification
+%    \item online verification of the certificate status. The application makes an http request, which downloads the Gcogle CRL at the official CRL distribution point. At this point, it can check the status of the certificate, i.e. whether it has been revoked/suspended or not.
+%\end{itemize}
+Then, the server verifies that the TEE serial number of the client device matches the expected one. To perform this check, the server compares the known TEE-SN to the TEE-SN that can be extracted from the first certificate in the chain sent by the client (the TEE is the issuer of that certificate).
+It's important to note that, this phase works under the assumption that the server already knows the TEE serial number information, which may be obtained, for instance, through prior physical access to the client device.
+
+\section{Final phase}
+Once these checks have been performed, the server will send back the results to the client which will display the outcome of the checks on the screen. So it is possible to understand if the data-sender binding verification was successful and, if not, distinguish which phase went wrong (certificate chain verification, digital signature verification, TEE-SN verification). 
+
+
+
+%The project followed the following phases: analysis of the requirements, exploration of the identifying codes present on smartphone devices, exploration of SIM identifiers, along with the investigation of the TPM and TEE modules on smartphone devices. Subsequently, the following activities were carried out: development of code to retrieve SIM identifying codes and development of code for the use of TPM and TEE. From the beginning, the decision was made to focus the study on Android devices in order to have greater freedom in device management, and therefore, official Android documentation was utilized for all information. In the following sections, each phase of the project will be analyzed. The details regarding the code will be analyzed in Chapter \ref{chap:Implementation Details}.
+%\section{Requirements analysis}\label{Requirements analysis}
+%In the initial phase of the project, the task was to analyze the requirement of finding one or more unique codes for the smartphone device to be used as a seed for creating a symmetric or asymmetric authentication protocol. Once the identifying code to be used as a seed was identified, it was necessary to derive a symmetric key or a pair of asymmetric keys through a key derivation function to sign a digest received from a server. Specifically, the server would be able to authenticate the identifier by decrypting the digest with the public key in the case of asymmetric encryption, or directly with the previously shared symmetric key by the device. From this, the need to find unique identifying codes for the device to be used as a seed was deduced, followed by the necessity of creating a protocol for validating the derived code through an authentication server.
+%\section{Identifying codes present on smartphone devices}\label{Identifying codes present on smartphone devices}
+%In the search for identifying unique codes for smartphone devices, the decision was made to focus on analyzing Android devices. Specifically, each code was classified based on two main factors: code reliability, which determines how effectively the code uniquely identifies the device and remains consistent over time (e.g., even after software uninstallation); and code accessibility, which determines how easily the code can be accessed through Android APIs and what permissions are required to obtain it. The identified codes are as follows:
+%\begin{itemize}
+%	\item IMEI (International Mobile Equipment Identity): it is a numerical code that uniquely identifies a mobile device (Mobile Equipment), which can be a cell phone or a modem. %wikipedia
+% This code is perfect from a reliability standpoint because it remains constant over time and can only be modified through specific procedures (considered illegal by law). However, it is poor in terms of accessibility as the access permissions required are very high and mostly available exclusively to applications from the device manufacturer.
+%	\item Serial Number: it is an hardware identifier of the device. as for the IMEI code, it identifies the device in a unique and constant way over time but it is not accessible except with very high permissions.
+%	\item Android ID: it is an identifier number that combine in a unique way the app-signing key, user, and device. The value may change if a factory reset is performed on the device or if an APK signing key changes. In this case the code is perfect from the accessibility point of view as no particular permissions are required, but poor from the point of view of reliability as it changes at each instance of the application. 
+%	\item FID (Firebase installation ID): it identify app installations and data tied to those app installations. As with the Android ID it is easely accessible from the permissions point of view, but it changes at each istance of the application.
+%	\item GUIDs o UUID (custom globally-unique IDs): It is an identifier code that can be created in the application at run time. There are four different basic types of UUIDs: time-based, DCE security, name-based, and randomly generated UUIDs. The UUID code is very easy to obtain since it can be directly generated by the software. However, it is evidently very poor in terms of reliability because, being created by the application itself, it changes with each execution of the code.
+%	\item Advertising ID: it is a unique, user-resettable identifier for advertising. The code does not require any special permissions but can be modified directly by the user, making it unsuitable in terms of reliability.
+%    \item MAC (Media Access Control) Address: it is a unique code assigned by the manufacturer to every ethernet or wireless network card produced worldwide. However, it can be modified at the software level. Even though it is modifiable, a MAC address remains a valid option in terms of reliability. However, accessing and modifying it requires very high permissions.
+%	\item IP (Internet Protocol) address: it is a uniquely identifies a device, known as a host, connected to a computer network that uses the Internet Protocol as its network protocol. However, this code is completely unusable as it can be easily modified and is not constant over time.
+%\end{itemize}
+%It is important to note that there is an official Android guide for the use of identifying codes. From this guide, it is evident that Android itself discourages device identification with respect to user privacy. However, on the same page, Android provides some simple solutions for non-invasive identification.
+%\\Following this investigation of identifying codes, it became evident that none of these codes were useful for the project's purpose. Hence, the idea arose to explore the use of secure modules such as TPM and TEE for direct device authentication.
+%\section{SIM identifiers}\label{SIM identifiers}
+%Parallel to the investigation of smartphone identifying codes, it became evident how SIM card identifying codes could be utilized to achieve the project's objectives. In this case as well, they are unique codes that are not easily modifiable and remain fixed over time, even after irreversible device events such as a factory reset. The only significant challenge with these particular identifiers is that they are associated with the SIM card and not directly with the device. This means that two different devices can share the same SIM card and thus have the same identifiers at different times, or a device may be without a SIM card and therefore unable to be identified.
+%\\However, studying these identifiers can be highly valuable when considering them as additional elements in a scenario involving multiple codes used in combination to create a single seed for the key derivation function, which generates the authentication key.
+%\\In particular, thanks to the study of the "Sim Serial Number (ICCID)" application and the information provided by the developer Alessandro Digilio, it was possible to identify the APIs to retrieve most of the information present in the SIM card, such as the ICCID (Integrated Circuit Card ID) and phone number. Subsequently, after developing a functional application capable of retrieving the desired information, the main focus of the project shifted to studying the secure modules of the Android device, such as TPM and TEE.
+%\section{TPM and TEE modules}\label{TPM and TEE modules}
+%Starting from the concept of TPM, the goal was to delve into the functioning of the TPM module in Android smartphones. It immediately became apparent that the concept of the keystore, a virtual and transparent space where all application keys and passwords are securely stored (similar to the TPM), played a crucial role.
+%\\By studying the Android documentation, particularly the APIs provided by the keystore, several properties for acquiring certificate chains related to the keystore itself emerged. Furthermore, through Google's "Verifying hardware-backed key pairs with Key Attestation" %google
+%page, it was possible to explore how the keystore enabled a key attestation mechanism. This mechanism not only obtained TEE certificates (Trusted Execution Environment) that validated the keystore's integrity but also performed TEE validation itself using Google's certificate acting as the certification authority.
+%\\This mechanism allowed obtaining unique certificates that identified the device and validating them directly through the corresponding certificate chain, with Google's certificate serving as the root of trust. As a result, the server can focus on verifying the validity of certificates at the time of storage.
+%\\Therefore this is undoubtedly the best solution for the realization of the project goals.
+%\newline
+
+%All the details about the study of the Android keystore, including its certificates, as well as the specifics of the software development related to this topic, will be further explored in the following chapter \ref{chap:Implementation Details}.

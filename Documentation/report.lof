@@ -1,0 +1,19 @@
+\babel@toc {english}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Icons of the two apps}}{7}{figure.caption.4}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Socket is identified by its ip address and port number}}{7}{figure.caption.5}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces The certificate chian}}{8}{figure.caption.6}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces The client produces the data, processes a digest, encrypts it with its own private key and sends it to the server as a digital signature}}{8}{figure.caption.7}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces The server receives the signature and verifies it, calculating the digest on the data and decrypting the signature with the public key of the client}}{9}{figure.caption.8}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Client has received some negative results from the verifications}}{19}{figure.caption.9}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Client has received some negative results from the verifications}}{20}{figure.caption.10}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {A.1}{\ignorespaces How to start the client}}{24}{figure.caption.12}%
+\contentsline {figure}{\numberline {A.2}{\ignorespaces Starting the server and receiving confirmation that data has been sent to the client}}{25}{figure.caption.13}%
+\contentsline {figure}{\numberline {A.3}{\ignorespaces Client has received successful results from the verifications}}{25}{figure.caption.14}%
+\contentsline {figure}{\numberline {A.4}{\ignorespaces Client has received some negative results from the verifications}}{26}{figure.caption.15}%

@@ -1,0 +1,49 @@
+\chapter{User Manual}
+\label{usermanual}
+%In the user manual you should explain, step-by-step, how to reproduce the demo that you showed in the oral presentation or the results you mentioned in the previous chapters.\\ If it is necessary to install some toolchain that is already well described in the original documentation (i.e., Espressif's toolchain for ESP32 boards or the SEcube toolchain) just insert a reference to the original documentation (and remember to clearly specify which version of the original documentation must be used). There is no need to copy and paste step-by-step guides that are already well-written and available.\\The user manual must explain how to re-create what you did in the project, no matter if it is low-level code (i..e VHDL on SEcube's FPGA), high-level code (i.e., a GUI) or something more heterogeneous (i.e. a bunch of ESP32 or Raspberry Pi communicating among them and interacting with other devices).  
+
+\section{How the applications work}
+\subsection{Client}
+To start the client application you need to insert the correct IP address and port number of the server application. The server \textbf{must be} already active and waiting for connections (see next subsection). Now you can press the \textbf{connect button}, so your app will generate a data and send all the necessary information to the server that will perform the verification. Now the application waits for the server responses.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.17]{images/open_client.jpeg}}
+    \caption{How to start the client}
+\end{figure}
+
+
+\subsection{Server}
+To start the server application you need to press the start server button. Now the server is active and waits for connections from clients. After a client application connects, in background it will perform some computation and verification and then sends back the results to the client. You can see the success status displayed when results are sent back.
+
+\begin{figure}[H]
+    \centering
+    \hspace{0.5cm}
+    \fbox{\includegraphics[scale=0.12]{images/before_send_server.jpeg}}
+    \hspace{0.3cm}
+    \fbox{\includegraphics[scale=0.12]{images/wait_for_clients.jpeg}}
+    \hspace{0.3cm}
+    \fbox{\includegraphics[scale=0.12]{images/after_send_server.jpeg}}
+    \caption{Starting the server and receiving confirmation that data has been sent to the client}
+\end{figure}
+
+\section{Final verification successfull}
+In case the verification is successfull, i.e. the certificate chain, the digital signature and the TEE serial number are verified correctly, the client will display the success status of each one of the verification.
+
+
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.12]{images/success_client.jpeg}}
+    \caption{Client has received successful results from the verifications}
+\end{figure}
+
+\section{Final verification failed}
+In case the verification fails, i.e. the certificate chain, the digital signature and the TEE serial number are not verified correctly (one of them or all), the client will display the fail status of verifications that have failed.
+Clearly, if just one of them fails, the whole verification can be considered failed.
+
+
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.2]{images/fail_client.jpeg}}
+    \caption{Client has received some negative results from the verifications}
+\end{figure}

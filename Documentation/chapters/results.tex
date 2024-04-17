@@ -1,0 +1,70 @@
+\chapter{Results}
+
+In this project we have explored the problem of authenticating data coming from a device (a smartphone) using features unique to that specific device. So, the goal was to define a methodology to demonstrate to an external verifier that that data was generated on this specific device.
+
+\section{Strategy adopted}
+To obtain this type of verification, we took advantage of the presence of the TEE module in the device, in this case a smartphone, basing our work on the fact that it is uniquely identified by a serial number. The TEE (Trusted Execution Environment) is a secure and isolated environment within the smartphone where critical operations and sensitive data are processed and protected. It also provide a higher level of security and trustworthiness for various tasks, including cryptography, authentication, and key management. 
+
+Indeed, in case of generation of a key-pair on a smartphone, this component is capable of certifying the generated key-pair by signing the public key. This also involves the generation of a certificate chain whose role is to certify in a chain the various certificates involved, up to that of Google which, as a CA, self-certifies itself.
+So if it is possible to deliver the \textbf{signed} sample data and the certificate chain to the server that perform the verification, by first validating the certificate chain and having the guarantee that it is authentic, it is possible to extract the serial number of the TEE which on the sender has certified the public key, in order to make a comparison. This is possible since the TEE module appears in the first certificate of the chain as an issuer, and its serial number is also present.
+The extracted TEE serial number, as mentioned, is then compared with the actual TEE serial number of the sender device (already known by the server in some way), thus managing to bind the signed data received to the device that actually produced it.
+
+\section{Use Cases}
+At the end of the verification, the server sends the client the outcome of the verification distinguishing three types of results: certificate chain verification result, digital signature verification result, TEE verification result.
+\\We deliberately decided to separate the three validation responses so that it is possible to visualize, for educational purposes, which phase has failed.
+Clearly, if just one of them fails, the whole verification can be considered failed. So, if, for example, the Certificate chain validation fails for some reason, all the signature validation must fail, instead continuing to check the signature value and the TEE serial number correspondence. In this "error case" the final result of the verification should be negative.\\\\
+Instead, for the verification to be considered successful, all three results must be true.
+Let's see some screenshots to understand how the client and server application works.
+
+\section{Final verification successfull}
+After all the verifications are done and succesSsful, the following screen will be displayed in the client:
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.2]{images/success_client.jpeg}}
+    \caption{Client has received some negative results from the verifications}\end{figure}
+\vspace{2cm}
+\section{Final verification failed}
+After all checks have been done and some have failed, the following screen will be displayed in the client:
+\begin{figure}[H]
+    \centering
+    \fbox{\includegraphics[scale=0.2]{images/fail_client.jpeg}}
+    \caption{Client has received some negative results from the verifications}
+\end{figure}
+
+\section{Known Issues}
+During the development of the project we faced a series of issues mainly related to security, design and communication between different apps.
+
+\subsection{Hardcoded data to sign}The data being signed and sent by the client is currently a static sample string that is hardcoded into the client's application. This inflexibility raises concerns, as it doesn't allow users to input their own text for signing.
+
+While it is technically possible to address this by introducing an input TextField for user-provided text, doing so may introduce additional security challenges. Specifically, securely transferring the user-entered string to the server would become a priority, requiring measures to ensure data integrity and confidentiality during transmission. These improvements would inevitably lead to having to modify the server code in order to consider also the  of the reception of the signed data to verify.
+\subsection{Secure trasmission of the TEE serial number} 
+The TEE is manually loaded into the server to easily perform the final verification. This is not 
+likely in possible real application of this technique.
+
+
+Advanced solutions could be adopted with which the client could be able to securely communicate its TEE serial number to the server, in the case that the verification could take place remotely and the server does not have physical access to the device under analysis. In this case the transmission of it should be totally secure and complications related to its confidentiality and integrity should be added.
+Moreover, the server could store a list of authorized devices to verify, saving their TEE serial number maybe after the use of some service.
+\subsection{Harcoded IP address} 
+The code presently has a fixed IP address for the socket. 
+
+A preferable approach would involve automatically fetching the IP address from the Network interface. This would ensure seamless adaptability to network changes, eliminating the need for manual code modifications or reloads. By dynamically retrieving the IP address, the application gains flexibility and user-friendliness, allowing it to function reliably in diverse network environments.
+
+
+
+\section{Future Work}
+The completion of this project marks a significant achievement, producing satisfactory outcomes. Nevertheless, it is crucial to recognize that there remain ample opportunities for further refinement and expansion. 
+
+\subsection{Local network limit}
+Currently the verification system composed of two applications (client and server) only works if the devices are connected to local networks. In fact, the socket communication channel with which the two apps communicate, works with limited delays only if the client and server IP addresses are of the \textbf{192.168.x.x class}.
+If you try to use the applications with a public IP, such as when you are connected to the data network 3G/4G or to two different local networks, the client application fails to connect to server and crashes for a TIMEOUT exception.
+
+In the future it is possible to investigate the problem and improve the communication system between the two apps in order to make it functional and resilient in various network conditions.
+
+\subsection{Google CRL fetch}
+The third check on the certificates in the certificate chain consists in making an HTTP request (GET) to the URL of the official Google CRL (Certificate Revocation list) distribution point \\
+\textit{https://android.googleapis.com/attestation/status}
+to check the status of the certificate (revoked/suspended/valid).
+The HTTP response contains a limited list of certificates/revoked keys of about fifty entries.
+
+This very limited list is not likely to represent the true amount of revoked or suspended certificates; in fact, the official documentation says that the list is not an exhaustive list of all issued keys. For this reason, in the future it would be possible to carry out further investigations on how reliable this list is and possibly integrate the control with CRLs downloaded from other distribution points.
+

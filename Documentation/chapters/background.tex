@@ -1,0 +1,70 @@
+\chapter{Background}
+%In the background chapter you should provide all the information required to acquire a sufficient knowledge to understand other chapters of the report. Suppose the reader is not familiar with the topic; so, for instance, if your project was focused on implementing a VPN, explain what it is and how it works. This chapter is supposed to work kind of like a "State of the Art" chapter of a thesis.\\ Organize the chapter in multiple sections and subsections depending on how much background information you want to include. It does not make any sense to mix background information about several topics, so you can split the topics in multple sections.\\Assume that the reader does not know anything about the topics and the tecnologies, so include in this chapter all the relevant information. Despite this, we are not asking you to write 20 pages in this chapter. Half a page, a page, or 2 pages (if you have a lot of information) for each `topic`(i.e. FreeRTOS, the SEcube, VPNs, Cryptomator, PUFs, Threat Monitoring....thinking about some of the projects...).
+In this section we will introduce some concepts that will be useful for understanding the operations done and described later in the report.
+
+
+\section{Asymmetric cryptography}\label{Asymmetric cryptography}
+The Asymmetric cryptography, also known as public-key cryptography, is a cryptographic system that uses a pair of keys to perform cryptographic operations: a \textbf{public key} and a \textbf{private key}. These keys are mathematically related, but while the public key can be freely distributed and disclosed, the private key must be kept secret. This technique can be used for several purposes, including Secure Data Transmission, Key Exchange, Secure Login and Authentication, but what we are interested in analyzing is the \textbf{digital signature}.
+It is possible to use asymmetric cryptography features in Android through the Android Keystore system and various cryptographic libraries available for Android development like Java Cryptography Architecture (JCA), which provides important classes like KeyPairGenerator, Signature, and Cipher.
+
+\section{Digital signature}\label{Digital signature}
+A Digital Signature is a cryptographic technique used to provide authenticity, integrity, and non-repudiation to digital messages or documents. It is generated using asymmetric cryptography, where a pair of keys (public key and private key) is used.
+The objective is to bound the data to the sender (the signer), in such way that is possible to verify that only the real signer could have signed the document, and that the data have not been manipulated in any way after the signature. It involves the use of an Hash function that generates a digest of the data to be signed and the key pair to encrypt/decrypt the digest.
+The following properties are guaranteed:
+\begin{itemize}
+    \item\textbf{Integrity of the data}: if some part of the data change, the digest will be different from the one encrypted, and the verifier can detect any modification;
+    \item\textbf{Authenticity of the data}: the signature is strictly related to the signed data (e.g. same signer with different data results in different signatures, on the contrary to the paper handmade signature which can be copied and pasted on different documents) so they are exactly the data that the signer wanted to sign;
+    \item\textbf{Authentication of the signer}: this can be obtained thanks to the usage of the key pair, where the private key is used only by the owner of the key pair, without sharing it to anyone.
+    \item\textbf{Non-repudiation}: if the key pair is certified by means of a certificate, for example an X509 certificate, that bounds the key pair with the legal proprietary, emitted by a trusted Certification Authority, this feature is added to the signature which means: the proprietary can not deny a signature on a document made with its key pair, with legal consequences. This is optional.
+\end{itemize}
+The two main phases of this operation are therefore the \textbf{signature}, using the private key (sender side), and the \textbf{verification}, using the public key (receiver side).
+
+\section{Hash functions}\label{Hash functions}
+A hash function is a one-way mathematical function that takes an input (or message) of any length and produces a fixed-size output, called a hash or \textbf{digest}. The hash function processes the input in a way that the output (digest) is unique and seemingly random, even for a small change in the input. A well-designed hash function should be deterministic, meaning the same input will always produce the same hash value.
+The choice of the hash function to use depends on the specific use and security requirements of your system, but to Digital signature purposes it is possible to use SHA family hash functions: \textbf{SHA-256}, SHA-384 and SHA-512, which produce digests of 256 bits, 384 bits and 512 bits respectively.
+
+\section{X.509 certificate}\label{X.509 certificate}
+An X.509 certificate is a digital document that is used to bind a public key to an entity, such as a person, organization, or device. It is commonly used in the context of public-key infrastructure (PKI) to establish trust and security in online communication. X.509 certificates are widely used in SSL/TLS for secure website connections, digital signatures, and other security applications. It contains various information, including the public key, \textbf{issuer} name and serial number (the entity that issued the certificate), \textbf{subject} (the entity to whom the certificate is issued) name and serial number, validity period, digital signature, and other attributes. The certificate is digitally signed by the issuer's private key to ensure its authenticity.
+
+\subsection{X.509 certificate chain}
+In public-key infrastructure the authenticity of an X.509 certificate is provided through a certificate chain, that is a sequence of X.509 certificates that establishes a trust path from an end-entity certificate (e.g., device or user certificate) to a trusted root certificate authority (CA). There could be intermediate Certification authorities and each certificate in the chain is digitally signed by the issuer's private key, forming a hierarchical structure of trust.
+
+\subsection{X.509 certificate verification}
+To verify a digital certificate, two commonly used methods are Certificate Revocation Lists (CRLs) and Online Certificate Status Protocol (OCSP).
+\begin{itemize}
+    \item \textbf{Certificate Revocation Lists (CRLs)}: CRLs are lists issued by the Certificate Authority (CA) containing the serial numbers of revoked certificates. To verify a certificate, the system checks if the certificate's serial number is present in the CRL. If it is, the certificate is considered revoked, and the verification fails.
+    \item \textbf{Online Certificate Status Protocol (OCSP)}: OCSP is a real-time method to check the status of a certificate's revocation. When a certificate is presented, the system sends a request to the CA's OCSP responder to check if the certificate is valid. The responder sends back a response, indicating if the certificate is valid, revoked, or unknown.
+\end{itemize}
+For the verification of X.509 certificates, in our implementation the CRLs mechanism will be used.
+
+
+
+\section{Root of trust}\label{Root of trust}
+The Root of Trust (RoT) is the foundational component in a security system that is inherently trusted.
+\begin{itemize}
+    \item In the context of \textbf{generating cryptographic material}, the RoT is a secure element or process that provides a trusted environment for generating and storing cryptographic keys. It ensures that the keys are generated in a secure manner and protected from unauthorized access.
+    \item In the context of \textbf{certificate chain generation and verification}, the Root of Trust refers to the trusted anchor in the chain of trust. It is the highest-level certificate authority (CA) that is inherently trusted by all parties involved.
+\end{itemize}
+The Root of trust is crucial since it ensures the integrity and trustworthiness of cryptographic operations and enables secure communication and identification within a system or network.
+
+\section{Trusted Execution Environment (TEE)}\label{TEE}
+A Trusted Execution Environment (TEE) is a secure area of a main processor that provides \textbf{hardware-based isolation}. It helps code and data loaded inside it to be protected with respect to confidentiality and integrity. Data integrity prevents unauthorized entities from outside the TEE from altering data, while code integrity prevents code in the TEE from being replaced or modified by unauthorized entities. 
+This secure environment can be used as a secure starting point (\textbf{root of trust}) for critical operations such as cryptographic key generation, so it can used to certify any keys or cryptographic material generated by exploiting it as a root. In this case it would play the role of the \textit{issuer} of the digital certificate that certify the generated cryptographic material.
+
+The most common TEE implementations in mobile devices are \textbf{ARM TrustZone}, Intel Software Guard Extensions (SGX), Qualcomm Trusted Execution Environment. Also, it is important to note that implementations of TEE can vary between different mobile devices and chip manufacturers. Some devices may use a combination of TEE technologies and architecture to provide enhanced security and isolation features. The latest android devices (smartphones and tablet) for example, use a \textbf{TEE with hierarchical architecture}, in which there are \textbf{two levels of TEE}, one more trusted than the other, capable of offering different security features.
+
+
+\section{Trusted Platform Module (TPM)}\label{TPM}
+A Trusted Platform Module (TPM) is a hardware-based security component that provides a \textbf{secure environment for cryptographic operations} like cryptographic key generation and secure storing, secure boot, random number generation and hardware encryption.
+To access TPM capabilities it is possible to use APIs made available by the Operating System; thay may vary depending on the operating system and device platform. 
+Usually the TPM consists of a dedicated chip, like in computers or laptops. However, in many cases, such as in smartphones not equipped with Hardware Backed security module, it translates into the presence of a \textbf{software module} that performs the operations described above. In the case of Android smartphones, this is the Android Keystore system.
+
+\section{Android Keystore system}\label{Keystore}
+The Android Keystore system lets you store cryptographic keys in a container to make them more difficult to extract from the device. Once keys are in the keystore, you can use them for cryptographic operations, with the key material remaining non-exportable. Also, the keystore system lets you restrict when and how keys can be used, such as requiring user authentication for key use or restricting keys to use only in certain cryptographic modes.
+In the KeyStore, the cryptographic material can be generated and manipulated leveraging two possible component:
+\begin{itemize}
+    \item\textbf{TEE}
+    \item\textbf{StrongBox Keymaster}: it is an enhancement to the Android Keystore system introduced in Android 9 (API level 28). It is designed to provide even higher levels of security for cryptographic keys and operations by leveraging \textbf{dedicated hardware security modules} known as StrongBox Keymaster HALs. 
+\end{itemize}
+In any case, exploiting the TEE as root of trust to generate cryptographic material and performing operations always offers higher security features than using StrongBox.
+It is important to underline that in Android, whenever applications perform operations that require the use of a key, this is retrieved directly from the Keystore where it is securely stored.

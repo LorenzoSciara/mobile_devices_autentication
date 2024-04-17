@@ -1,0 +1,8 @@
+\chapter*{Abstract}
+The project addresses the challenge of authenticating data originating from a smartphone device, aiming to provide a methodology to prove the origin of data to an external verifier. The unique identification of a device is a crucial aspect with multiple implications. In addition to ensuring security and authentication in IT operations, it allows you to track the use of devices, simplifying resource management and improving the user experience. Furthermore, this unique identification can prevent counterfeiting and protect sensitive data from unauthorized access. In summary, the ability to uniquely identify each device is critical to creating a trusted, efficient, and personalized computing environment. In particular, we want to have sure proof that a generic data was actually produced by a certain device.
+
+Leveraging a secure area of the main processor of Android smartphones as a hardware-backed root of trust, the Trusted Execution Environment, applications perform cryptographic operations that lead to the creation and attestation of cryptographic keys.
+This process yields a unique and reliable identifier, associated with the device, that can be used in the verifying phase to effectively guaranteeing and proving the authenticity of the sent data.
+Furthermore, we considered the use of SIM card information as alternative identifiers, but they have not been considered for implementation purposes as it did not properly address the project goals.
+Rather they could be used to strengthen the verification process in future developments.
+Our progress was guided by official Android documentation and hands-on experimentation using Android Studio.
